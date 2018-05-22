@@ -48,6 +48,7 @@
 
 #include <stdio.h>  /* printf(), fopen(), fwrite() */
 #include <stdlib.h> /* malloc(), EXIT_SUCCESS, strtol(), exit() */
+#include <stdint.h> /* fixed size integer types */
 #include <string.h> /* strcmp(), strcpy() */
 #include <limits.h> /* strtol() */
 #include <sys/stat.h> /* stat() */
@@ -109,7 +110,7 @@ int main(int argc, char *argv[]);
  * LSB .. Least Significant Byte first (LittleEndian) e.g. Intel Pentium
  */
 void checkEndian(void){
-        unsigned long ulong = 0x12345678;
+        uint32_t ulong = 0x12345678;
         unsigned char *ucharP;
 
         ucharP = (unsigned char *)(&ulong);
@@ -166,9 +167,9 @@ void writeBmpFile(unsigned char *bitmapP, int spacing, int colchar, FILE *bmpP){
         int bmppad; /* number of padding pixels */
         unsigned long bmpTotalSize; /* bmp filesize (byte) */
         /*  bmp-lines needs to be long alined and padded with 0 */
-        unsigned long ulong;
-        unsigned short ushort;
-        signed long slong;
+        uint32_t ulong;
+        uint16_t ushort;
+        int32_t slong;
         unsigned char uchar;
         int i,x,y,g,tmp;
         int rowchar; /* number of row glyphs */
@@ -188,7 +189,7 @@ void writeBmpFile(unsigned char *bitmapP, int spacing, int colchar, FILE *bmpP){
 
         bmppad = ((bmpw + 3) / 4 * 4) - bmpw;
         bmpTotalSize = (bmpw + bmppad) * bmph
-                + sizeof(long)*11 + sizeof(short)*5 + sizeof(char)*4*256;
+                + sizeof(int32_t)*11 + sizeof(int16_t)*5 + sizeof(char)*4*256;
         v_printf("  BMP filesize = %d bytes\n", (int)bmpTotalSize);
 
 
@@ -204,7 +205,7 @@ void writeBmpFile(unsigned char *bitmapP, int spacing, int colchar, FILE *bmpP){
         dwrite(&ushort, sizeof(ushort), bmpP); /* reserved as 0 */
 
         /* bfOffBits: offset to image-data array */
-        ulong = sizeof(long)*11 + sizeof(short)*5 + sizeof(char)*4*256;
+        ulong = sizeof(int32_t)*11 + sizeof(int16_t)*5 + sizeof(char)*4*256;
         dwrite(&ulong, sizeof(ulong), bmpP);
 
 

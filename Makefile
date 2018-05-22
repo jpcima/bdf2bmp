@@ -1,7 +1,7 @@
 
 CC = gcc
-CFLAGS = -m32 -O2 -g
-LDFLAGS = -m32
+CFLAGS = -O2 -g
+LDFLAGS =
 
 all: bdf2bmp
 
