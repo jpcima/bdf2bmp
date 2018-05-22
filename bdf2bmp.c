@@ -238,17 +238,17 @@ void writeBmpFile(unsigned char *bitmapP, int spacing, int colchar, FILE *bmpP){
          * RGBQUAD[256]: color palette
          */
         /*   palette[0]: background of glyphs */
+        uchar = 0;
+        for(i=0; i<4; i++)
+                dwrite(&uchar, sizeof(uchar), bmpP); /* palette[1]: #000000 */
+
+        /*   palette[1]: foreground of glyphs */
         uchar = 0xff;
         dwrite(&uchar, sizeof(uchar), bmpP); /* rgbBlue: B */
         dwrite(&uchar, sizeof(uchar), bmpP); /* rgbGreen: G */
         dwrite(&uchar, sizeof(uchar), bmpP); /* rgbRed: R */
         uchar = 0;
         dwrite(&uchar, sizeof(uchar), bmpP); /* rgbReserved: must be 0 */
-
-        /*   palette[1]: foreground of glyphs */
-        uchar = 0;
-        for(i=0; i<4; i++)
-                dwrite(&uchar, sizeof(uchar), bmpP); /* palette[1]: #000000 */
 
         /*   palette[2]: spacing */
         uchar = COLOR_SPACING_BLUE;
@@ -649,7 +649,7 @@ int main(int argc, char *argv[]){
         int i, j, tmp, n, dst, c;
         char *sP;
         unsigned char *bitmapP = NULL; /* address of bitmapAREA */
-        int spacing = 2; /* breadth of spacing (default 2) */
+        int spacing = 0; /* breadth of spacing (default 0) */
         int flag;
         int colchar = 32; /* number of columns(horizontal) (default 32) */
         char paramP[PARAM_MAX][LINE_CHARMAX]; /* parameter strings */

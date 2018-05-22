@@ -19,7 +19,7 @@ OPTIONS
     -s<number>
         This option specifies the width of spacing.
         The <number> can range from 0 to 32.  The
-        default is 2.
+        default is 0.
 
     -c<number>
         This option specifies the number of columns in
