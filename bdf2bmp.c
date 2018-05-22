@@ -95,7 +95,7 @@ static int endian; /* 0 = MSB, 1 = LSB */
 /* func prototype */
 void checkEndian(void);
 void dwrite(const void *ptrP, int n, FILE *outP);
-void writeBmpFile(unsigned char *bitmapP, int spacing, int colchar, FILE *bmpP);
+void writeBmpFile(unsigned char *bitmapP, int spacing, int colchar, int monochrome, FILE *bmpP);
 void assignBitmap(unsigned char *bitmapP, char *glyphP, int sizeglyphP, struct boundingbox glyph, int dw);
 int getLine(char* lineP, int max, FILE* inputP);
 unsigned char *readBdfFile(unsigned char *bitmapP, FILE *readP);
@@ -161,10 +161,13 @@ void dwrite(const void *varP, int n, FILE *outP){
  * 3. read bitmapAREA(onMemory) and write bmpFile with adding spacing
  *    BMP-file: noCompression(BI_RGB), 8bitColor, Windows-Win32 type
  */
-void writeBmpFile(unsigned char *bitmapP, int spacing, int colchar, FILE *bmpP){
+void writeBmpFile(unsigned char *bitmapP, int spacing, int colchar, int monochrome, FILE *bmpP){
         long bmpw; /* bmp-image width (pixel) */
         long bmph; /* bmp-image height (pixel) */
         int bmppad; /* number of padding pixels */
+        int bpp; /* number of bits per pixel */
+        int rowbits; /* number of bits per row, not considering padding */
+        int rowbytes; /* number of bytes per row, not considering padding */
         unsigned long bmpTotalSize; /* bmp filesize (byte) */
         /*  bmp-lines needs to be long alined and padded with 0 */
         uint32_t ulong;
@@ -187,9 +190,13 @@ void writeBmpFile(unsigned char *bitmapP, int spacing, int colchar, FILE *bmpP){
         d_printf("  number of glyphs column=%d ", colchar);
         d_printf("row=%d\n", rowchar);
 
-        bmppad = ((bmpw + 3) / 4 * 4) - bmpw;
-        bmpTotalSize = (bmpw + bmppad) * bmph
-                + sizeof(int32_t)*11 + sizeof(int16_t)*5 + sizeof(char)*4*256;
+        bpp = monochrome ? 1 : 8;
+        rowbits = bmpw * bpp;
+        rowbytes = (rowbits + 7) / 8;
+
+        bmppad = ((rowbytes + 3) / 4 * 4) - rowbytes;
+        bmpTotalSize = (rowbytes + bmppad) * bmph
+                + sizeof(int32_t)*11 + sizeof(int16_t)*5 + sizeof(char)*4*(1<<bpp);
         v_printf("  BMP filesize = %d bytes\n", (int)bmpTotalSize);
 
 
@@ -205,7 +212,7 @@ void writeBmpFile(unsigned char *bitmapP, int spacing, int colchar, FILE *bmpP){
         dwrite(&ushort, sizeof(ushort), bmpP); /* reserved as 0 */
 
         /* bfOffBits: offset to image-data array */
-        ulong = sizeof(int32_t)*11 + sizeof(int16_t)*5 + sizeof(char)*4*256;
+        ulong = sizeof(int32_t)*11 + sizeof(int16_t)*5 + sizeof(char)*4*(1<<bpp);
         dwrite(&ulong, sizeof(ulong), bmpP);
 
 
@@ -220,7 +227,7 @@ void writeBmpFile(unsigned char *bitmapP, int spacing, int colchar, FILE *bmpP){
         dwrite(&slong, sizeof(slong), bmpP);
         ushort = 1; /* biPlanes: must be 1 */
         dwrite(&ushort, sizeof(ushort), bmpP);
-        ushort = 8; /* biBitCount: 8bitColor */
+        ushort = bpp; /* biBitCount: 8bitColor */
         dwrite(&ushort, sizeof(ushort), bmpP);
         ulong = 0; /* biCompression: noCompression(BI_RGB) */
         dwrite(&ulong, sizeof(ulong), bmpP);
@@ -230,7 +237,7 @@ void writeBmpFile(unsigned char *bitmapP, int spacing, int colchar, FILE *bmpP){
         dwrite(&slong, sizeof(slong), bmpP);
         slong = 0; /* biYPelsPerMeter: res y; 0 is ok */
         dwrite(&slong, sizeof(slong), bmpP);
-        ulong = 0; /* biClrUsed: optimized color palette; not used */
+        ulong = monochrome ? 2 : 256; /* biClrUsed: optimized color palette */
         dwrite(&ulong, sizeof(ulong), bmpP);
         ulong = 0; /* biClrImportant: 0 is ok */
         dwrite(&ulong, sizeof(ulong), bmpP);
@@ -251,73 +258,98 @@ void writeBmpFile(unsigned char *bitmapP, int spacing, int colchar, FILE *bmpP){
         uchar = 0;
         dwrite(&uchar, sizeof(uchar), bmpP); /* rgbReserved: must be 0 */
 
-        /*   palette[2]: spacing */
-        uchar = COLOR_SPACING_BLUE;
-        dwrite(&uchar, sizeof(uchar), bmpP); /* B */
-        uchar = COLOR_SPACING_GREEN;
-        dwrite(&uchar, sizeof(uchar), bmpP); /* G */
-        uchar = COLOR_SPACING_RED;
-        dwrite(&uchar, sizeof(uchar), bmpP); /* R */
-        uchar = 0;
-        dwrite(&uchar, sizeof(uchar), bmpP); /* must be 0 */
+        if(!monochrome) {
+            /*   palette[2]: spacing */
+            uchar = COLOR_SPACING_BLUE;
+            dwrite(&uchar, sizeof(uchar), bmpP); /* B */
+            uchar = COLOR_SPACING_GREEN;
+            dwrite(&uchar, sizeof(uchar), bmpP); /* G */
+            uchar = COLOR_SPACING_RED;
+            dwrite(&uchar, sizeof(uchar), bmpP); /* R */
+            uchar = 0;
+            dwrite(&uchar, sizeof(uchar), bmpP); /* must be 0 */
 
-        /*   palette[3]: out of dwidth over baseline */
-        uchar = COLOR_OVERBL_BLUE;
-        dwrite(&uchar, sizeof(uchar), bmpP); /* B */
-        uchar = COLOR_OVERBL_GREEN;
-        dwrite(&uchar, sizeof(uchar), bmpP); /* G */
-        uchar = COLOR_OVERBL_RED;
-        dwrite(&uchar, sizeof(uchar), bmpP); /* R */
-        uchar = 0;
-        dwrite(&uchar, sizeof(uchar), bmpP); /* must be 0 */
+            /*   palette[3]: out of dwidth over baseline */
+            uchar = COLOR_OVERBL_BLUE;
+            dwrite(&uchar, sizeof(uchar), bmpP); /* B */
+            uchar = COLOR_OVERBL_GREEN;
+            dwrite(&uchar, sizeof(uchar), bmpP); /* G */
+            uchar = COLOR_OVERBL_RED;
+            dwrite(&uchar, sizeof(uchar), bmpP); /* R */
+            uchar = 0;
+            dwrite(&uchar, sizeof(uchar), bmpP); /* must be 0 */
 
-        /*   palette[4]: out of dwidth; under baseline */
-        uchar = COLOR_UNDERBL_BLUE;
-        dwrite(&uchar, sizeof(uchar), bmpP); /* B */
-        uchar = COLOR_UNDERBL_GREEN;
-        dwrite(&uchar, sizeof(uchar), bmpP); /* G */
-        uchar = COLOR_UNDERBL_RED;
-        dwrite(&uchar, sizeof(uchar), bmpP); /* R */
-        uchar = 0;
-        dwrite(&uchar, sizeof(uchar), bmpP); /* must be 0 */
+            /*   palette[4]: out of dwidth; under baseline */
+            uchar = COLOR_UNDERBL_BLUE;
+            dwrite(&uchar, sizeof(uchar), bmpP); /* B */
+            uchar = COLOR_UNDERBL_GREEN;
+            dwrite(&uchar, sizeof(uchar), bmpP); /* G */
+            uchar = COLOR_UNDERBL_RED;
+            dwrite(&uchar, sizeof(uchar), bmpP); /* R */
+            uchar = 0;
+            dwrite(&uchar, sizeof(uchar), bmpP); /* must be 0 */
 
-        /*   palette[5] to palette[255]: not used */
-        for(i=5; i<256; i++){
-                uchar = 0x00; /* palette[5to255]: #000000 */
-                dwrite(&uchar, sizeof(uchar), bmpP);
-                dwrite(&uchar, sizeof(uchar), bmpP);
-                dwrite(&uchar, sizeof(uchar), bmpP);
-                dwrite(&uchar, sizeof(uchar), bmpP);
+            /*   palette[5] to palette[255]: not used */
+            for(i=5; i<256; i++){
+                    uchar = 0x00; /* palette[5to255]: #000000 */
+                    dwrite(&uchar, sizeof(uchar), bmpP);
+                    dwrite(&uchar, sizeof(uchar), bmpP);
+                    dwrite(&uchar, sizeof(uchar), bmpP);
+                    dwrite(&uchar, sizeof(uchar), bmpP);
+            }
         }
 
         /*
          * IMAGE DATA array
          */
         for(y=bmph-1; y>=0; y--){
-                for(x=0; x<bmpw+bmppad; x++){
-                        if(x>=bmpw){
-                                /* padding: long(4bytes) aligned */
-                                uchar = 0; /* must pad with 0 */
-                                dwrite(&uchar, sizeof(uchar), bmpP);
-                        }else{
-                                if( (y%(font.h+spacing)<spacing) || (x%(font.w+spacing)<spacing) ){
-                                        /* spacing */
-                                        uchar = 2; /* fill palette[2] */
-                                        dwrite(&uchar, sizeof(uchar), bmpP);
-                                }else{
-                                        /* read bitmapAREA & write bmpFile */
-                                        g = (x/(font.w+spacing)) + (y/(font.h+spacing)*colchar);
-                                        bx = x - (spacing*(g%colchar)) - spacing;
-                                        by = y - (spacing*(g/colchar)) - spacing;
-                                        tmp = g*(font.h*font.w) + (by%font.h)*font.w + (bx%font.w);
-                                        if(tmp >= chars*font.h*font.w){
-                                                /* spacing over the last glyph */
-                                                uchar = 2; /* fill palette[2] */
-                                        }else
-                                                uchar = *( bitmapP + tmp);
-                                        dwrite(&uchar, sizeof(uchar), bmpP);
-                                }
+                if(monochrome){
+                        uchar = 0;
+                        for(x=0; x<rowbytes*8; x++){
+                               unsigned bit;
+                               if(x>=bmpw){
+                                       bit = 0;
+                               }else if( (y%(font.h+spacing)<spacing) || (x%(font.w+spacing)<spacing) ){
+                                       /* spacing */
+                                       bit = 0; /* fill palette[2] */
+                               }else{
+                                       /* read bitmapAREA & write bmpFile */
+                                       g = (x/(font.w+spacing)) + (y/(font.h+spacing)*colchar);
+                                       bx = x - (spacing*(g%colchar)) - spacing;
+                                       by = y - (spacing*(g/colchar)) - spacing;
+                                       tmp = g*(font.h*font.w) + (by%font.h)*font.w + (bx%font.w);
+                                       bit = *( bitmapP + tmp) > 0;
+                               }
+                               uchar |= bit << (7-x%8);
+                               if((x+1)%8==0){
+                                       dwrite(&uchar, sizeof(uchar), bmpP);
+                                       uchar = 0;
+                               }
                         }
+                }else{
+                        for(x=0; x<bmpw; x++){
+                               if( (y%(font.h+spacing)<spacing) || (x%(font.w+spacing)<spacing) ){
+                                       /* spacing */
+                                       uchar = 2; /* fill palette[2] */
+                               }else{
+                                       /* read bitmapAREA & write bmpFile */
+                                       g = (x/(font.w+spacing)) + (y/(font.h+spacing)*colchar);
+                                       bx = x - (spacing*(g%colchar)) - spacing;
+                                       by = y - (spacing*(g/colchar)) - spacing;
+                                       tmp = g*(font.h*font.w) + (by%font.h)*font.w + (bx%font.w);
+                                       if(tmp >= chars*font.h*font.w){
+                                               /* spacing over the last glyph */
+                                               uchar = 2; /* fill palette[2] */
+                                       }else
+                                               uchar = *( bitmapP + tmp);
+                               }
+                               dwrite(&uchar, sizeof(uchar), bmpP);
+                        }
+                }
+                for(x=0; x<bmppad; x++){
+                        /* padding: long(4bytes) aligned */
+                        uchar = 0;
+                        dwrite(&uchar, sizeof(uchar), bmpP);
                 }
         }
         return;
@@ -655,6 +687,7 @@ int main(int argc, char *argv[]){
         int colchar = 32; /* number of columns(horizontal) (default 32) */
         char paramP[PARAM_MAX][LINE_CHARMAX]; /* parameter strings */
         int iflag = OFF;
+        int monochrome = ON;
         struct stat fileinfo;
 
         /*
@@ -677,6 +710,7 @@ int main(int argc, char *argv[]){
                         for(j=1; j<(int)strlen(argv[i]); j++){
                                 if(argv[i][j]=='w' ||
                                    argv[i][j]=='i' ||
+                                   argv[i][j]=='m' ||
                                    argv[i][j]=='h' ||
                                    argv[i][j]=='v')
                                 {
@@ -739,6 +773,8 @@ int main(int argc, char *argv[]){
                                 dwflag = ON;
                         else if(paramP[i][1] == 'i')
                                 iflag = ON;
+                        else if(paramP[i][1] == 'm')
+                                monochrome = OFF;
                         else if( (paramP[i][1]=='v') || (paramP[i][1]=='h'))
                                 printhelp();
                         break;
@@ -809,7 +845,7 @@ int main(int argc, char *argv[]){
         fclose(readP);
 
         /* write bmp-image-file */
-        writeBmpFile(bitmapP, spacing, colchar, writeP);
+        writeBmpFile(bitmapP, spacing, colchar, monochrome, writeP);
         tmp = fclose(writeP);
         if(tmp == EOF){
                 printf("error: cannot write '%s'\n", writeFilename);
